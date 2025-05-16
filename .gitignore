@@ -362,5 +362,5 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
-Builds/VisualStudio2022/.vs/
-Builds/VisualStudio2022/h64/
+Builds/
+JuceLibraryCode/
