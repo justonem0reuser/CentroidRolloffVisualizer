@@ -1,7 +1,7 @@
 #pragma once
 #include <JuceHeader.h>
 
-static class FeaturesCalculator
+class FeaturesCalculator
 {
 public:
     static float rms(std::vector<float>& samples);

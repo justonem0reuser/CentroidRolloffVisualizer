@@ -15,7 +15,7 @@ PluginEditor::PluginEditor(PluginProcessor& p)
 
     setSize (800, 600);
     setResizable(true, false);
-    setResizeLimits(800, 600, 4000, 4000);
+    setResizeLimits(600, 300, 4000, 4000);
     centreWithSize(getWidth(), getHeight());
     startTimerHz(timerHz);
 }

@@ -12,8 +12,8 @@ float FeaturesCalculator::rms(std::vector<float>& samples)
 void FeaturesCalculator::centroidRolloff(std::vector<float>& fft, double rate, float rollonFrac, float rolloffFrac, float& centroid, float& rollon, float& rolloff)
 {
     const int size = fft.size();
-    if (size % 4 > 0)
-        throw std::exception("Wrong fft size");
+    jassert(size % 4 == 0);
+
     const int n = size / 4 + 1;
     const float freqCoeff = rate * 2 / size;
     float sum = 0.f;
@@ -56,7 +56,7 @@ void FeaturesCalculator::smooth(float real, float coeff, float& smoothed)
 }
 
 float FeaturesCalculator::search(std::vector<float>& data, float percent)
-{     // TODO: test!!!
+{
     int n = data.size(),
         left = 0,
         right = n - 1;

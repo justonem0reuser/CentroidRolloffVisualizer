@@ -22,14 +22,14 @@ void Plot::drawAxes(juce::Graphics& g)
     for (int i = 0; i <= 10; i++)
     {
         g.setColour(axesColour);
-        int x = std::roundf(juce::jmap(i / 10.f, 0.f, 1.f, 0.f, maxX));
+        int x = std::round(juce::jmap(i / 10.f, 0.f, 1.f, 0.f, maxX));
         g.drawVerticalLine(x, 0.f, maxY);
     }
 
     g.setColour(axesColour);
     for (int f = 20; f <= 20000; f += (f < 200 ? 20 : f < 2000 ? 200 : 2000))
     {
-        int y = std::roundf(juce::jmap(std::log10f(f), logMinFreq, logMaxFreq, maxY, 0.f));
+        int y = std::round(juce::jmap(std::log10((float)f), logMinFreq, logMaxFreq, maxY, 0.f));
         g.drawHorizontalLine(y, 0.f, maxX);
     }
 }
@@ -51,20 +51,20 @@ void Plot::drawCentroidRolloff(juce::Graphics& g)
             {
                 float
                     centroidY = juce::jmap(
-                        std::log10f(centroid),
+                        std::log10(centroid),
                         logMinFreq, logMaxFreq,
                         height, 0.f),
                     rolloffY = juce::jmap(
-                        std::log10f(rolloff),
+                        std::log10(rolloff),
                         logMinFreq, logMaxFreq,
                         height, 0.f),
                     rollonY = juce::jmap(
-                        std::log10f(rollon),
+                        std::log10(rollon),
                         logMinFreq, logMaxFreq,
                         height, 0.f),
                     rectHeight = rollonY - rolloffY,
                     centroidRelPos = rectHeight == 0.f ? -1.f : (centroidY - rolloffY) / rectHeight,
-                    cornerSize = fminf(centroidY - rolloffY, rollonY - centroidY);
+                    cornerSize = std::fmin(centroidY - rolloffY, rollonY - centroidY);
 
                 if (rectHeight < 1.f)
                     rectHeight = 1.f;

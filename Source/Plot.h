@@ -20,9 +20,9 @@ private:
         minFreq = 20.f,
         maxFreq = 20000.f;
     const float
-        logMinFreq = std::log10f(minFreq),
-        logMaxFreq = std::log10f(maxFreq),
-        logMaxDivMinFreq = std::log10f(maxFreq / minFreq);
+        logMinFreq = std::log10(minFreq),
+        logMaxFreq = std::log10(maxFreq),
+        logMaxDivMinFreq = std::log10(maxFreq / minFreq);
 
     PluginProcessor& audioProcessor;
 
