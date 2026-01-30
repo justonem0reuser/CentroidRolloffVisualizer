@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "CentroidRolloffPanVisualizer.h"
+#include "FeaturesCalculator.h"
 
 class PluginEditor  : 
     public juce::AudioProcessorEditor,
@@ -47,6 +48,11 @@ private:
 
     std::unique_ptr<CentroidRolloffPanVisualizer> centroidVisualizer;
 
+    juce::dsp::FFT forwardFFT;
+    juce::dsp::WindowingFunction<float> window;
+    std::array<std::array<float, 2 * PluginProcessor::fftSize>, 2> fftData;
+
+    void drawNextFrameOfSpectrum();
     void attach(juce::Slider& slider,
                 juce::Label& label,
                 std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment>& attachment,

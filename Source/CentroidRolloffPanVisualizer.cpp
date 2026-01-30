@@ -2,8 +2,7 @@
 #include "CentroidRolloffPanVisualizer.h"
 
 //==============================================================================
-CentroidRolloffPanVisualizer::CentroidRolloffPanVisualizer(PluginProcessor& p):
-    audioProcessor(p)
+CentroidRolloffPanVisualizer::CentroidRolloffPanVisualizer(PluginProcessor& p)
 {
     plot = std::make_unique<Plot>(p);
     addAndMakeVisible(plot.get());
@@ -46,11 +45,14 @@ void CentroidRolloffPanVisualizer::drawAxesText(juce::Graphics& g)
         g.drawSingleLineText(yAxisValues[i], 2, 
             juce::jmap((float)i, 0.f, 3.f, height - plotMargin, plotMargin) + yBias);
 
+    auto newFont = font.withHeight(font.getHeight() + 4);
+    g.setFont(newFont);
+    
     g.drawSingleLineText(xAxisName, 0.5f * width, plotMargin - 5,
         juce::Justification::horizontallyCentred);
 
     juce::GlyphArrangement ga;
-    ga.addLineOfText(g.getCurrentFont(), yAxisName, 0, 0);
+    ga.addLineOfText(newFont, yAxisName, 0, 0);
     juce::Path p;
     ga.createPath(p);
     auto pathBounds = p.getBounds();
@@ -58,7 +60,7 @@ void CentroidRolloffPanVisualizer::drawAxesText(juce::Graphics& g)
         .rotated(juce::degreesToRadians(90.f),
             pathBounds.getCentreX(),
             pathBounds.getCentreY())
-        .translated(getWidth() - plotMargin + 2.f * yBias + 2 - pathBounds.getCentreX(),
+        .translated(width - plotMargin + 2.f * yBias + 2 - pathBounds.getCentreX(),
                     0.5f * getHeight()  - pathBounds.getCentreY())
     );
     g.fillPath(p);

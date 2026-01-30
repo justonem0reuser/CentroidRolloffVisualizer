@@ -1,6 +1,5 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
-#include "FeaturesCalculator.h"
 
 //==============================================================================
 PluginProcessor::PluginProcessor()
@@ -14,21 +13,7 @@ PluginProcessor::PluginProcessor()
                      #endif
                        )
 #endif
-    , forwardFFT(fftOrder),
-    window(fftSize, juce::dsp::WindowingFunction<float>::hann),
-    balance(0),
-    smoothedBalance(0)
 {
-    rms[0] = rms[1] = 0;
-    scopeData[0].resize(scopeSize);
-    scopeData[1].resize(scopeSize);
-    freqBalance.resize(scopeSize);
-    fifo[0].resize(fftSize);
-    fifo[1].resize(fftSize);
-    fifo[0].resize(fftSize);
-    fifo[1].resize(fftSize);
-    fftData[0].resize(fftSize * 2);
-    fftData[1].resize(fftSize * 2);
 }
 
 PluginProcessor::~PluginProcessor()
@@ -110,51 +95,14 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 {
 }
 
-void PluginProcessor::drawNextFrameOfSpectrum()
-{
-    double rate = getSampleRate();
-    auto balPar = apvts.getParameter(balStr),
-        freqPar = apvts.getParameter(freqStr),
-        rollonPar = apvts.getParameter(rollonStr),
-        rolloffPar = apvts.getParameter(rolloffStr);
-    float balCoeff = balPar->convertFrom0to1(balPar->getValue()),
-        freqCoeff = freqPar->convertFrom0to1(freqPar->getValue()),
-        rollonFrac = rollonPar->convertFrom0to1(rollonPar->getValue()),
-        rolloffFrac = rolloffPar->convertFrom0to1(rolloffPar->getValue());
-
-    int totalNumInputChannels = getTotalNumInputChannels();
-    for (int i = 0; i < totalNumInputChannels; i++)
-    {
-        rms[i] = FeaturesCalculator::rms(fftData[i]);
-        FeaturesCalculator::smooth(rms[i], balCoeff, smoothedRms[i]);
-
-        window.multiplyWithWindowingTable(fftData[i].data(), fftSize);
-        forwardFFT.performFrequencyOnlyForwardTransform(fftData[i].data());
-
-        FeaturesCalculator::centroidRolloff(
-            fftData[i], rate, rollonFrac, rolloffFrac, centroid[i], rollon[i], rolloff[i]);
-        FeaturesCalculator::smooth(centroid[i], freqCoeff, smoothedCentroid[i]);
-        FeaturesCalculator::smooth(rolloff[i], freqCoeff, smoothedRolloff[i]);
-        FeaturesCalculator::smooth(rollon[i], freqCoeff, smoothedRollon[i]);
-    }
-
-    if (totalNumInputChannels == 1)
-        smoothedBalance = balance = 0.0f;
-    else
-    {
-        balance = FeaturesCalculator::balance(rms[0], rms[1]);
-        FeaturesCalculator::smooth(balance, balCoeff, smoothedBalance);
-    }
-}
-
 //==============================================================================
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    fifoIndex[0] = fifoIndex[1] = 0;
-    smoothedBalance = balance = 0.0f;
+    smoothedBalance = 0.f;
     for (int i = 0; i < 2; i++)
-        smoothedRms[i] = smoothedCentroid[i] = smoothedRollon[i] = smoothedRolloff[i] = 
-            rms[i] = centroid[i] = rollon[i] = rolloff[i] = 0.0f;
+        smoothedRms[i] = smoothedCentroid[i] = smoothedRollon[i] = smoothedRolloff[i] = 0.f;
+    abstractFifo.reset();
+    nextFFTBlockReady.store(false, std::memory_order_release);
 }
 
 void PluginProcessor::releaseResources()
@@ -185,16 +133,31 @@ bool PluginProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
 void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    int totalNumInputChannels  = getTotalNumInputChannels();
-    int totalNumOutputChannels = getTotalNumOutputChannels();
-    int numSamples = buffer.getNumSamples();
+    int totalNumInputChannels  = std::min(getTotalNumInputChannels(), 2);
+    if (totalNumInputChannels == 0)
+        return;
 
-    for (int channel = 0; channel < totalNumInputChannels; channel++)
+    int numSamples = buffer.getNumSamples();
+    auto* channelData0 = buffer.getReadPointer(0);
+    auto* channelData1 = buffer.getReadPointer(totalNumInputChannels == 2 ? 1 : 0);
+    auto& fifo0 = fifo[0];
+    auto& fifo1 = fifo[1];
+
+    for (auto i = 0; i < numSamples; i++)
     {
-        auto* channelData = buffer.getReadPointer(channel);
-            for (auto i = 0; i < numSamples; i++)
-                //if (channelData[i] >= -1.f && channelData[i] <= 1.f) // TODO: ?
-                    pushNextSampleIntoFifo(channel, channelData[i]);
+        int start1, size1, start2, size2;
+        abstractFifo.prepareToWrite(1, start1, size1, start2, size2);
+
+        if (size1 > 0) // size2 is always 0 as only 1 sample is requested to be written
+        {
+            fifo0[start1] = channelData0[i];
+            fifo1[start1] = channelData1[i];
+            abstractFifo.finishedWrite(size1);
+            if (abstractFifo.getNumReady() == fftSize)
+                nextFFTBlockReady.store(true, std::memory_order_release);
+        }
+        //else
+        //    abstractFifo.finishedWrite(size1);
     }
 }
 
@@ -221,24 +184,6 @@ void PluginProcessor::setStateInformation (const void* data, int sizeInBytes)
     auto tree = juce::ValueTree::readFromData(data, sizeInBytes);
     if (tree.isValid())
         apvts.replaceState(tree);
-}
-
-void PluginProcessor::pushNextSampleIntoFifo(int channel, float sample) noexcept
-{
-    // if the fifo contains enough data, set a flag to say
-    // that the next frame should now be rendered..
-    if (fifoIndex[channel] == fftSize)
-    {
-        if (!nextFFTBlockReady[channel])
-        {
-            std::fill(fftData[channel].begin(), fftData[channel].end(), 0.0f);
-            std::copy(fifo[channel].begin(), fifo[channel].end(), fftData[channel].begin());
-            nextFFTBlockReady[channel] = true;
-        }
-
-        fifoIndex[channel] = 0;
-    }
-    fifo[channel][fifoIndex[channel]++] = sample;
 }
 
 //==============================================================================

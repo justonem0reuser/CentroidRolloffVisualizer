@@ -1,6 +1,6 @@
 #include "FeaturesCalculator.h"
 
-float FeaturesCalculator::rms(std::vector<float>& samples)
+float FeaturesCalculator::rms(std::array<float, 2 * PluginProcessor::fftSize>& samples)
 {
     const int size = samples.size();
     float res = 0.f;
@@ -9,16 +9,13 @@ float FeaturesCalculator::rms(std::vector<float>& samples)
     return std::sqrt(res / size);
 }
 
-void FeaturesCalculator::centroidRolloff(std::vector<float>& fft, double rate, float rollonFrac, float rolloffFrac, float& centroid, float& rollon, float& rolloff)
+void FeaturesCalculator::centroidRolloff(std::array<float, 2 * PluginProcessor::fftSize>& fft, double rate, float rollonFrac, float rolloffFrac, float& centroid, float& rollon, float& rolloff)
 {
-    const int size = fft.size();
-    jassert(size % 4 == 0);
-
-    const int n = size / 4 + 1;
-    const float freqCoeff = rate * 2 / size;
+    std::array<float, PluginProcessor::fftSize / 2 + 1> e;
+    const int n = e.size();
+    const float freqCoeff = rate / PluginProcessor::fftSize;
     float sum = 0.f;
     float numerator = 0.f;
-    std::vector<float> e(n);
 
     for (int i = 0; i < n; i++)
     {
@@ -55,7 +52,7 @@ void FeaturesCalculator::smooth(float real, float coeff, float& smoothed)
     smoothed = coeff * (smoothed - real) + real;
 }
 
-float FeaturesCalculator::search(std::vector<float>& data, float percent)
+float FeaturesCalculator::search(std::array<float, PluginProcessor::fftSize / 2 + 1>& data, float percent)
 {
     int n = data.size(),
         left = 0,

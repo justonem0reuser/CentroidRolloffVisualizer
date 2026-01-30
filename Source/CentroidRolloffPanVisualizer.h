@@ -28,8 +28,6 @@ private:
     };
     const std::array<juce::String, 4> yAxisValues { "20", "200", "2000", "20000" };
 
-    PluginProcessor& audioProcessor;
-
     void drawAxesText(juce::Graphics& g);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CentroidRolloffPanVisualizer)
