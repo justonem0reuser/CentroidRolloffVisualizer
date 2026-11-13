@@ -11,7 +11,7 @@ jobs:
       version: ${{ steps.set_version.outputs.VERSION }}
       juce_version: ${{ steps.read_versions.outputs.JUCE_VERSION }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
     
       - id: set_version
         run: |
@@ -35,10 +35,10 @@ jobs:
       - set-version
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Restore cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build/_deps
           key: windows-deps-${{ needs.set-version.outputs.juce_version }}
@@ -46,10 +46,12 @@ jobs:
       - name: Download Inno Setup (if not cached)
         shell: pwsh
         run: |
+          $ProgressPreference = 'SilentlyContinue'
           if (-not (Test-Path "$PWD/build/_deps/inno-setup/ISCC.exe")) {
               New-Item -ItemType Directory -Force -Path build/_deps/inno-setup
-              Invoke-WebRequest "https://jrsoftware.org/download.php/is.exe" -OutFile "build/_deps/inno-setup/is.exe"
+              Invoke-WebRequest "https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe" -OutFile "build/_deps/inno-setup/is.exe"
               Start-Process "build/_deps/inno-setup/is.exe" -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /DIR=$PWD/build/_deps/inno-setup" -Wait
+              if (-not (Test-Path "$PWD/build/_deps/inno-setup/ISCC.exe")) { throw "Inno Setup install failed" }
           }
 
       - name: Configure CMake
@@ -57,7 +59,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path build
           cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DVERSION="${{ needs.set-version.outputs.version }}"
+          cmake .. -G "Visual Studio 18 2026" -A x64 -DCMAKE_BUILD_TYPE=Release -DVERSION="${{ needs.set-version.outputs.version }}"
 
       - name: Build Project
         run: |
@@ -65,7 +67,7 @@ jobs:
           cmake --build . --config Release --parallel
 
       - name: Upload build VST artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: output-vst3-windows
           path: ./build/CentroidRolloffVisualizer_artefacts/Release/VST3/CentroidRolloffVisualizer.vst3
@@ -94,7 +96,7 @@ jobs:
           & $isccPath /O"$outputDir" $issPath
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: output-ins-windows
           path: ./build/inno
@@ -105,14 +107,14 @@ jobs:
       - set-version
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # Unlike Windows and MacOS cache, Linux cache doesn't include JUCE build files
       # as building JUCE requires additional dependencies installation,
       # therefore dependency version conflicts can occur
       # between JUCE and CentroidRolloffVisualizer.
       - name: Restore cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build/_deps/juce-${{ needs.set-version.outputs.juce_version }}/juce-src
           key: linux-deps-${{ needs.set-version.outputs.juce_version }}
@@ -141,7 +143,7 @@ jobs:
         run: cmake --build build --config Release -- -j$(nproc)
 
       - name: Upload VST3 artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: output-vst3-linux
           path: ./build/CentroidRolloffVisualizer_artefacts/Release/VST3/CentroidRolloffVisualizer.vst3
@@ -152,10 +154,10 @@ jobs:
       - set-version
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Restore cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build/_deps
           key: macos-deps-${{ needs.set-version.outputs.juce_version }}
@@ -172,13 +174,13 @@ jobs:
           cmake --build . --config Release -- -j$(sysctl -n hw.ncpu)
 
       - name: Upload VST3 artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: output-vst3-macos
           path: ./build/CentroidRolloffVisualizer_artefacts/Release/VST3/CentroidRolloffVisualizer.vst3
 
       - name: Upload AU artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: output-au-macos
           path: ./build/CentroidRolloffVisualizer_artefacts/Release/AU/CentroidRolloffVisualizer.component
@@ -196,13 +198,13 @@ jobs:
 
     steps:
       - name: Download VST3 artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: output-vst3-windows
           path: CentroidRolloffVisualizer.vst3
 
       - name: Download installator artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: output-ins-windows
           path: CentroidRolloffVisualizer-installer
@@ -236,7 +238,7 @@ jobs:
 
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: output-vst3-linux
           path: CentroidRolloffVisualizer.vst3
@@ -266,13 +268,13 @@ jobs:
 
     steps:
     - name: Download VST3 artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: output-vst3-macos
         path: CentroidRolloffVisualizer.vst3
 
     - name: Download AU artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: output-au-macos
         path: CentroidRolloffVisualizer.component
